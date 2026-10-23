@@ -1,0 +1,26 @@
+{
+  "saved_holdout": {
+    "stack_spearman": 0.6585469867566554,
+    "base_spearmans": {
+      "xgb": 0.6368950220413386,
+      "rf": 0.6770793256416557,
+      "ridge": 0.4351715794206675,
+      "elastic_net": 0.40182449439348084,
+      "knn": 0.3371768545086242,
+      "mlp": 0.5046887095503196
+    }
+  },
+  "repeated_holdout": {
+    "stack_mean": 0.7071500444495659,
+    "stack_std": 0.053680958089798364,
+    "base_means": {
+      "elastic_net": 0.45897881383587125,
+      "knn": 0.43365049942417794,
+      "mlp": 0.5311106034978695,
+      "rf": 0.7069486282752449,
+      "ridge": 0.484999458846441,
+      "xgb": 0.6866279253921709
+    }
+  },
+  "provenance": "Extracted from outputs saved in the supplied team pipeline.ipynb; not rerun during repository preparation."
+}

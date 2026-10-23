@@ -1,0 +1,12 @@
+torch
+fair-esm
+transformers
+biopython
+scikit-learn
+xgboost
+imbalanced-learn
+optuna
+pandas
+numpy
+scipy
+jupyterlab

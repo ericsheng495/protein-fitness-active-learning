@@ -1,0 +1,19 @@
+# Credentials are never part of the repository.
+APIKey.txt
+**/APIKey.txt
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local environments, model weights, and generated caches.
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+cache/
+*.pt
+*.pth
+query.txt

@@ -1,0 +1,97 @@
+[
+  {
+    "file": "top10.txt",
+    "source": "team code archive",
+    "sha256": "2104dc779edbb08c3227c8c8d21b1df3854d6b9606ffe68c10d69844fb32da9b"
+  },
+  {
+    "file": "data/query_round_2.txt",
+    "source": "team code archive",
+    "sha256": "c31b7722f4b8b3d216cae22cf200b5e3a25d118c5c9698bafc8ad579e0467184"
+  },
+  {
+    "file": "requirements.txt",
+    "source": "team code archive",
+    "sha256": "2fa81b6b1d39191ee0f64f0b2027cff60be6f5aa731cd0577c1976b38b5b35d9"
+  },
+  {
+    "file": "data/query_round_3.txt",
+    "source": "team code archive",
+    "sha256": "d5fe32f90bb2a82ebf58c6208ba54206b25d7475e8701ef4f52a903a8a7f93f5"
+  },
+  {
+    "file": "data/sequence.fasta",
+    "source": "team code archive",
+    "sha256": "424cfb53a84622b15d46f49c1dd9bf41135a12bf2418a2af776a49617fe15770"
+  },
+  {
+    "file": "data/query_round_1_results.csv",
+    "source": "team code archive",
+    "sha256": "d6f28a2b409c38d8f1bb9cfe59d8736132384b6bcdaf9512b61ae6c0ab64ae23"
+  },
+  {
+    "file": "data/README.txt",
+    "source": "team code archive",
+    "sha256": "41379148d543c3fca967bc413088bdf7672731f7ec8268cca3c6aa815369045c"
+  },
+  {
+    "file": "data/query_round_1.txt",
+    "source": "team code archive",
+    "sha256": "fa18272314686b639e37ae30783646742ae13b530d675cba60e349688edd8c5f"
+  },
+  {
+    "file": "data/query_round_3_results.csv",
+    "source": "team code archive",
+    "sha256": "52d0024aa24aad425defb1d326bcbfa4ebdcad26be9bbfe1c8842c05cdc4006b"
+  },
+  {
+    "file": "data/test.csv",
+    "source": "team code archive",
+    "sha256": "6cbdb46002942d150fd530e0d2c048ab0920d31934502e8a82b18637b7a2c598"
+  },
+  {
+    "file": "GroupName.txt",
+    "source": "team code archive",
+    "sha256": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
+  },
+  {
+    "file": "pipeline.py",
+    "source": "team code archive",
+    "sha256": "d655d46e4aca203b43f0d1e7655e45a54bac0898b3953696dcf021ad38f35e77"
+  },
+  {
+    "file": "predictions.csv",
+    "source": "team code archive",
+    "sha256": "25c5b2c955e0dce81aa32fcb947cad9835ff6b4668ce4142881b4ba291261620"
+  },
+  {
+    "file": "data/train.csv",
+    "source": "team code archive",
+    "sha256": "6d3122663ab02d088e5a8f54481d581c0418d560afeb99254c8d05f3a02ec599"
+  },
+  {
+    "file": "data/query_round_2_results.csv",
+    "source": "team code archive",
+    "sha256": "aef9ff2bf193e83a3f849f70acf269d246267facdbdb7b96194c863724830e33"
+  },
+  {
+    "file": "docs/report/Team20_Hackathon_Report.pdf",
+    "source": "Team20_Hackathon_Report.pdf",
+    "sha256": "e56201ddafed42a7b370951d698696d0a3b57c2fa1211b673bfef17065eb450c"
+  },
+  {
+    "file": "docs/instructions/MLB26_Hackathon_Overview.pdf",
+    "source": "MLB26 Hackathon.pdf",
+    "sha256": "dd23707f8008bc1cca4068f18e7217243d410a3e62f0bdfcd13eb60f1121575d"
+  },
+  {
+    "file": "docs/instructions/MLB_S26_Hackathon_Guide.pdf",
+    "source": "MLB S26 Hackathon Docs.pdf",
+    "sha256": "cb05a9001d7591804af0ca66ec7270344929c6ca2fa4cf29698ef04683406c02"
+  },
+  {
+    "file": "docs/instructions/Hackathon_Logistics.pdf",
+    "source": "Hackathon_Logistics (1).pdf",
+    "sha256": "92f613298fdb0bc25bf31b620ac5f65832688b39f7f1d5c1ccb7990a30d71cca"
+  }
+]
