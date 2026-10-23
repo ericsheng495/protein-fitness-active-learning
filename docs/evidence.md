@@ -51,4 +51,4 @@ This is Team 20's course project. The report describes approximately equal contr
 
 ## Repository organization
 
-Source code lives in `src/`, the notebook in `notebooks/`, and archived submission files in `results/submissions/`. New predictions and query files default to the ignored `results/generated/` directory. The source manifest paths describe the initial imported layout; original files can be matched to their current locations by filename and hash, except for the documented edits.
+Source code lives in `src/`, the notebook in `notebooks/`, and archived submission files in `results/submissions/`. New predictions and query files default to the ignored `results/generated/` directory. The source manifest records current file locations with hashes of the originally imported versions; documented edits may change the current hashes.

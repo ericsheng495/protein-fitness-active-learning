@@ -1,6 +1,6 @@
 [
   {
-    "file": "top10.txt",
+    "file": "results/submissions/top10.txt",
     "source": "team code archive",
     "sha256": "2104dc779edbb08c3227c8c8d21b1df3854d6b9606ffe68c10d69844fb32da9b"
   },
@@ -50,17 +50,17 @@
     "sha256": "6cbdb46002942d150fd530e0d2c048ab0920d31934502e8a82b18637b7a2c598"
   },
   {
-    "file": "GroupName.txt",
+    "file": "results/submissions/GroupName.txt",
     "source": "team code archive",
     "sha256": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
   },
   {
-    "file": "pipeline.py",
+    "file": "src/pipeline.py",
     "source": "team code archive",
     "sha256": "d655d46e4aca203b43f0d1e7655e45a54bac0898b3953696dcf021ad38f35e77"
   },
   {
-    "file": "predictions.csv",
+    "file": "results/submissions/predictions.csv",
     "source": "team code archive",
     "sha256": "25c5b2c955e0dce81aa32fcb947cad9835ff6b4668ce4142881b4ba291261620"
   },
