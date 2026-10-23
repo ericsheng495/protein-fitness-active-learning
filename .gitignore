@@ -17,3 +17,6 @@ cache/
 *.pt
 *.pth
 query.txt
+
+# Generated run outputs; historical submissions remain tracked.
+results/generated/

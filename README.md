@@ -89,10 +89,10 @@ Use Python 3.11–3.13 from the repository root:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-jupyter lab pipeline.ipynb
+jupyter lab notebooks/pipeline.ipynb
 ```
 
-Run all notebook cells to load the original data and all three query-result files, extract features, train and evaluate the stack, and export `predictions.csv` and `top10.txt`. A new run overwrites those archived submission files. Initial execution downloads pretrained weights; embeddings are cached locally. Device selection uses CUDA, then Apple MPS, then CPU.
+Run all notebook cells to load the original data and all three query-result files, extract features, train and evaluate the stack, and export `predictions.csv` and `top10.txt` into `results/generated/`. Historical submissions remain in `results/submissions/`. Initial execution downloads pretrained weights; embeddings are cached locally. Device selection uses CUDA, then Apple MPS, then CPU.
 
 To verify the included artifacts without installing ML dependencies:
 
@@ -102,16 +102,26 @@ python3 scripts/audit_artifacts.py
 
 The audit checks mutation sequences, query uniqueness, prediction coverage and bounds, and top-10 consistency. GitHub Actions also runs this audit and compiles the Python sources.
 
-## Files
+## Repository structure
 
-| Path | Contents |
-|---|---|
-| `pipeline.py` / `pipeline.ipynb` | Final team implementation and notebook |
-| `data/` | Wild-type sequence, training/test data, query requests and measurements |
-| `predictions.csv` / `top10.txt` | Archived final submissions |
-| `results/` | Saved local evaluation metrics |
-| `docs/report/` / `docs/instructions/` | Team report and course materials |
-| `docs/evidence.md` | Provenance and implementation limitations |
-| `scripts/audit_artifacts.py` | Artifact validation |
+```text
+├── src/pipeline.py             # Feature extraction, training, and acquisition
+├── notebooks/pipeline.ipynb    # End-to-end workflow
+├── data/                       # Sequences, labels, and historical queries
+├── results/
+│   ├── submissions/            # Historical predictions, top 10, and team ID
+│   └── saved_notebook_metrics.json
+├── docs/
+│   ├── report/                 # Team report
+│   ├── instructions/           # Course materials
+│   ├── archive/                # Original run instructions
+│   └── evidence.md             # Provenance and evaluation limitations
+├── scripts/audit_artifacts.py  # Artifact validation
+├── .github/workflows/verify.yml
+├── requirements.txt
+└── README.md
+```
+
+New runs write to the ignored `results/generated/` directory by default; `Config.output_dir` can override this location. Model weights and embedding caches remain outside version control.
 
 Oracle credentials are excluded. No API key is needed to train with the included measurements. Original course materials and team work retain their existing ownership.

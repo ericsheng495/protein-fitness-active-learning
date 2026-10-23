@@ -90,12 +90,12 @@ def main() -> None:
         prior_positions.update(positions)
     require(len(train_ids | queried) == 1440, "Unexpected final label count")
 
-    predictions = read_csv("predictions.csv", {"mutant", "DMS_score_predicted"})
+    predictions = read_csv("results/submissions/predictions.csv", {"mutant", "DMS_score_predicted"})
     require([r["mutant"] for r in predictions] == [r["mutant"] for r in test],
             "Prediction coverage/order differs from test.csv")
     values = scores(predictions, "DMS_score_predicted")
     score_map = dict(zip((r["mutant"] for r in predictions), values))
-    top10 = (ROOT / "top10.txt").read_text().splitlines()
+    top10 = (ROOT / "results/submissions/top10.txt").read_text().splitlines()
     require(len(top10) == len(set(top10)) == 10 and set(top10) <= test_ids,
             "Invalid top-10 membership")
     top_values = [score_map[m] for m in top10]

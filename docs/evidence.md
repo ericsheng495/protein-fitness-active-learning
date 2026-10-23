@@ -2,11 +2,11 @@
 
 ## Sources
 
-The implementation source is the downloaded `CSE 7850 - Team 20 - Hackathon Codebase-20261023T033752Z-1-001.zip`. `pipeline.py` is copied without edits. Data, archived queries, returned labels, predictions, and top-10 recommendations come from the same archive. The notebook's code cells are retained; outputs and execution counts are cleared. Its two metric outputs are extracted into `results/saved_notebook_metrics.json` before clearing.
+The implementation source is the downloaded `CSE 7850 - Team 20 - Hackathon Codebase-20261023T033752Z-1-001.zip`. The final pipeline is preserved in `src/pipeline.py`, with output path handling updated to write new artifacts to `results/generated/` (or `Config.output_dir`). Model and acquisition logic are unchanged. Data, archived queries, returned labels, predictions, and top-10 recommendations come from the same archive. The notebook is stored in `notebooks/`; its setup cells resolve the repository root and import from `src/`. Outputs and execution counts are cleared. Its two metric outputs are extracted into `results/saved_notebook_metrics.json` before clearing.
 
 The report is `Team20_Hackathon_Report.pdf`. Instruction PDFs are the downloaded detailed S26 guide, overview slides, and latest logistics copy. Their source filenames and SHA-256 hashes appear in `source-manifest.json`. The manifest records the copied source versions before the two documented text changes below; it is a provenance record, not a checksum assertion for every final file.
 
-The original `requirements.txt` is retained with `jupyterlab` appended so the documented notebook command is available. The original data README's `sequences.fasta` typo is corrected to the actual `sequence.fasta`. The team's original root README is archived as `original-README.md`. New material consists of the expanded root README, this evidence note, source manifest, extracted metrics, artifact audit, `.gitignore`, and CI configuration. No pretrained weights, caches, or oracle API key are committed.
+The original `requirements.txt` is retained with `jupyterlab` appended so the documented notebook command is available. The original data README's `sequences.fasta` typo is corrected to the actual `sequence.fasta`. The team's original root README is archived as `archive/original-README.md`. New material consists of the expanded root README, this evidence note, source manifest, extracted metrics, artifact audit, `.gitignore`, and CI configuration. No pretrained weights, caches, or oracle API key are committed.
 
 The earlier downloaded `cse_7850_hackathon-main.zip` is a different modular project. Its `plm_finetune.py` is not evidence that the supplied final pipeline fine-tuned a PLM. It is intentionally excluded. `Team20.pdf` concerns a separate microbiome project and is unrelated.
 
@@ -19,7 +19,7 @@ The earlier downloaded `cse_7850_hackathon-main.zip` is a different modular proj
 | Local stack holdout 0.6585 | Saved notebook output | Historical output, not a new run |
 | Local repeated-holdout stack 0.7072 ± 0.0537 | Saved notebook output | Five random outer holdouts; not position-disjoint outer tests |
 | 1,140 initial + 300 queried = 1,440 unique labels | CSVs and query files | Recomputed by artifact audit |
-| 11,324 predictions and ten recommendations | Root submission files | Membership/coverage checked; hidden accuracy cannot be recomputed |
+| 11,324 predictions and ten recommendations | `results/submissions/` files | Membership/coverage checked; hidden accuracy cannot be recomputed |
 | Query means 0.7780, 0.8013, 0.8261 | Returned-label CSVs | Selection statistics, not evidence of an improved engineered protein |
 
 ## Differences between the narrative and the final artifacts
@@ -48,3 +48,7 @@ Preparing this repository does not rerun the full PLM embedding/training workflo
 ## Attribution and ownership
 
 This is Team 20's course project. The report describes approximately equal contributions after initial independent exploration and does not provide component-level authorship. Course PDFs retain their original authorship. No broad software or dataset license has been added without evidence that the source owners granted it. `APIKey.txt` is omitted entirely, including from Git history.
+
+## Repository organization
+
+Source code lives in `src/`, the notebook in `notebooks/`, and archived submission files in `results/submissions/`. New predictions and query files default to the ignored `results/generated/` directory. The source manifest paths describe the initial imported layout; original files can be matched to their current locations by filename and hash, except for the documented edits.

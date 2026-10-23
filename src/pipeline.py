@@ -52,6 +52,7 @@ KD_HYDRO = {
 @dataclass
 class Config:
     data_dir: Path = field(default_factory=lambda: Path("data"))
+    output_dir: Optional[Path] = None
     cache_dir: Path = field(default_factory=lambda: Path("cache"))
     holdout_index_path: Path = field(default_factory=lambda: Path("cache/holdout_indices.npy"))
     query_results_glob: str = "query_round_*_results.csv"
@@ -142,8 +143,13 @@ class Config:
     def project_root(self) -> Path:
         return Path(self.data_dir).resolve().parent
 
+    def output_path(self) -> Path:
+        path = Path(self.output_dir) if self.output_dir is not None else self.project_root() / "results" / "generated"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     def query_txt_path(self) -> Path:
-        return self.project_root() / self.query_txt_name
+        return self.output_path() / self.query_txt_name
 
     def effective_device(self) -> str:
         raw = None if self.device is None else str(self.device).strip().lower()
@@ -1772,7 +1778,7 @@ def run_pipeline(cfg: Config, run_optuna: bool = False) -> PipelineResults:
 
 
 def export_submission_files(results: PipelineResults) -> Dict[str, Path]:
-    root = results.cfg.project_root()
+    root = results.cfg.output_path()
     pred_path = root / "predictions.csv"
     top10_path = root / "top10.txt"
     save_predictions_csv(results.predictions, pred_path)

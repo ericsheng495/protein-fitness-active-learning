@@ -11,4 +11,4 @@ jobs:
       - name: Validate data, queries and submissions
         run: python scripts/audit_artifacts.py
       - name: Compile Python sources
-        run: python -m compileall -q pipeline.py scripts
+        run: python -m compileall -q src scripts
