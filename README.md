@@ -1,5 +1,7 @@
 # ML-Guided Protein Engineering with Active Learning
 
+**Team 20:** Florin Brunner, Abigail Cressy, Sofia Oliver, Chittebbayi Penugonda, and Eric Sheng.
+
 **Rank protein mutations with limited experimental labels using frozen protein language model features, a stacked regression ensemble, and three rounds of active learning.** Team 20 · CSE 7850 / CX 4803 · ML4BIO Hackathon.
 
 The team's report records an improvement from **~0.05 → ~0.19 → ~0.39 Spearman correlation** across development milestones. The final archive contains predictions for **11,324 candidate mutants**, a top-10 recommendation list, and **300 acquired labels**. These are historical artifacts; the external leaderboard scores have not been independently reproduced.
