@@ -14,24 +14,21 @@ The task is to predict normalized Deep Mutational Scanning (DMS) scores in [0, 1
 
 The dataset contains one **656-residue protein**, **1,140 initially labeled mutants**, and **300 additional measurements** acquired in three batches of 100. Merging these measurements produces 1,440 unique training examples. Mutation identifiers use zero-based positions: `W560F` replaces tryptophan at position 560 with phenylalanine.
 
-## Technical implementation
+## Prediction walkthrough
 
-```mermaid
-flowchart TD
-    A[Wild-type sequence and mutation identifiers] --> B[Validate and reconstruct mutant sequences]
-    B --> C[Biochemical descriptors]
-    B --> D[Frozen ESM-2 embeddings and zero-shot scores]
-    C --> E[Feature matrix]
-    D --> E
-    E --> F[Position-grouped folds and training-fold PCA]
-    F --> G[Base regressors]
-    G --> H[Out-of-fold predictions]
-    H --> I[Ridge stacking model]
-    I --> J[Fitness predictions and top-10 recommendations]
-    I --> K[Active-learning selection]
-    K --> L[Acquire labels and retrain downstream models]
-    L --> E
-```
+![A W560F substitution is encoded with frozen ESM-2 and biochemical features, then scored by trained regressors.](docs/assets/prediction-walkthrough.png)
+
+The illustration uses the actual sequence around residue 560 and the archived prediction for `W560F`. The saved submission begins with:
+
+| Rank | Mutant | Predicted DMS fitness |
+|---:|---|---:|
+| 1 | `W560F` | 0.9117 |
+| 2 | `W590F` | 0.9056 |
+| 3 | `W582Y` | 0.9051 |
+
+These are saved model predictions; higher scores indicate higher predicted fitness. [Full prediction file](results/submissions/predictions.csv) · [Top ten](results/submissions/top10.txt)
+
+## Technical implementation
 
 ### Feature extraction
 
@@ -51,11 +48,25 @@ ESM runs in evaluation mode under `torch.no_grad()`. **The protein model is froz
 | ElasticNetCV | Biochemical and trailing features, excluding embeddings |
 | Random forest, Ridge, kNN, MLP | Full feature matrix |
 
+```mermaid
+flowchart LR
+    A[Biochemical features] --> B[XGBoost]
+    C[Features without embeddings] --> D[ElasticNet]
+    E[Full features] --> F[RF / Ridge / kNN / MLP]
+    B --> G[Out-of-fold predictions]
+    D --> G
+    F --> G
+    G --> H[Ridge combiner]
+    H --> I[Ranked candidates]
+```
+
 Base models generate out-of-fold predictions using `GroupKFold` grouped by mutation position. A Ridge meta-model combines these predictions; its regularization strength is selected using cross-validation Spearman correlation. Base learners use squared-error-style objectives.
 
 The MLP has two 256-unit hidden layers with ReLU and 0.2 dropout, trained with MSE, AdamW, and early stopping. Additional regularization includes embedding noise and upper-tail augmentation. The augmentation code attempts `SMOTER` and falls back to duplicating high-fitness samples with Gaussian feature noise.
 
 ### Active learning
+
+![Fit the model, select a diverse batch of up to 100 mutants, acquire labels, and retrain for three rounds.](docs/assets/active-learning-loop.png)
 
 | Round | Acquisition strategy | Measured batch mean DMS |
 |---|---|---:|
@@ -69,11 +80,7 @@ Batch means describe selected candidates, not measured improvement over wild typ
 
 ## Results
 
-| Development stage | Reported external Spearman |
-|---|---:|
-| Baseline | ~0.05 |
-| After initial PLM integration and querying | ~0.19 |
-| Stacking, PCA, and portfolio acquisition | ~0.39 |
+![Reported Spearman correlation increases from about 0.05 to 0.19 to 0.39 across development stages.](docs/assets/reported-performance.png)
 
 The reported gain is **~0.34 Spearman**. Saved notebook outputs separately record a local stack mean of **0.7072 ± 0.0537** across five random holdouts, nearly tied with random forest at **0.7069**. Local and external scores use different evaluation protocols and are not directly comparable. Historical metrics are preserved in [results/saved_notebook_metrics.json](results/saved_notebook_metrics.json); full training has not been rerun during repository preparation.
 
@@ -112,11 +119,14 @@ The audit checks mutation sequences, query uniqueness, prediction coverage and b
 │   ├── submissions/            # Historical predictions, top 10, and team ID
 │   └── saved_notebook_metrics.json
 ├── docs/
+│   ├── assets/                 # README diagrams and performance chart
 │   ├── report/                 # Team report
 │   ├── instructions/           # Course materials
 │   ├── archive/                # Original run instructions
 │   └── evidence.md             # Provenance and evaluation limitations
-├── scripts/audit_artifacts.py  # Artifact validation
+├── scripts/
+│   ├── audit_artifacts.py      # Artifact validation
+│   └── generate_figures.py     # Regenerate README visuals (matplotlib)
 ├── .github/workflows/verify.yml
 ├── requirements.txt
 └── README.md
@@ -125,3 +135,5 @@ The audit checks mutation sequences, query uniqueness, prediction coverage and b
 New runs write to the ignored `results/generated/` directory by default; `Config.output_dir` can override this location. Model weights and embedding caches remain outside version control.
 
 Oracle credentials are excluded. No API key is needed to train with the included measurements. Original course materials and team work retain their existing ownership.
+
+README figures can be regenerated with `python scripts/generate_figures.py` after installing the optional `matplotlib` dependency.
