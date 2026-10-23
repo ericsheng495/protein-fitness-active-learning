@@ -4,302 +4,114 @@
 
 CSE 7850 / CX 4803 · ML4BIO Hackathon
 
-This project predicts the functional effects of single amino acid substitutions using frozen protein language model representations, biochemical features, and a stacked regression ensemble. Three rounds of active learning expand the training set under a limited experimental labeling budget.
+Predict the fitness of single amino acid substitutions and recommend high-performing mutants using limited experimental labels. The pipeline combines frozen ESM-2 representations, biochemical features, stacked regression, and three rounds of active learning. The team report records Spearman correlation improving from **~0.05 to ~0.39**.
 
-The team's report records an improvement from **~0.05 → ~0.19 → ~0.39 Spearman correlation** across development milestones. The final archive contains predictions for **11,324 candidate mutants**, a top-10 recommendation list, and **300 acquired labels**. External performance values are reported in the team report; local evaluation results are preserved separately in the repository.
+[Project report](docs/report/Team20_Hackathon_Report.pdf) · [Task guide](docs/instructions/MLB_S26_Hackathon_Guide.pdf) · [Implementation notes](docs/evidence.md)
 
-The protein language model remains frozen throughout training. Supervised learning updates the downstream regressors, MLP, and stacking model; active learning adds selected DMS measurements for subsequent retraining. Parameter-efficient fine-tuning is a potential extension.
+## Objective and data
 
-[Report](docs/report/Team20_Hackathon_Report.pdf) · [Task guide](docs/instructions/MLB_S26_Hackathon_Guide.pdf) · [Overview slides](docs/instructions/MLB26_Hackathon_Overview.pdf) · [Logistics](docs/instructions/Hackathon_Logistics.pdf) · [Evidence and limitations](docs/evidence.md)
+The task is to predict normalized Deep Mutational Scanning (DMS) scores in [0, 1], rank **11,324 candidate mutants**, and recommend the top ten. Spearman correlation measures agreement with the measured fitness ranking.
 
-## Objective and success criteria
+The dataset contains one **656-residue protein**, **1,140 initially labeled mutants**, and **300 additional measurements** acquired in three batches of 100. Merging these measurements produces 1,440 unique training examples. Mutation identifiers use zero-based positions: `W560F` replaces tryptophan at position 560 with phenylalanine.
 
-Wet-lab measurements are expensive. Given one wild-type protein and a limited set of measured variants, the task was to learn a function from a **single-site amino acid substitution** to a normalized **DMS fitness score in [0, 1]**. A higher score indicates better measured function in the supplied assay.
-
-There were two connected objectives:
-
-1. **Rank the full candidate set accurately.** Submit a score for each of the 11,324 test mutants; Spearman correlation evaluates agreement with the hidden fitness ranking.
-2. **Find useful experimental candidates.** Recommend ten test mutants with high fitness and use at most 300 new measurements to improve the predictor.
-
-The project is regression with a ranking evaluation, rather than classification. Spearman is the correlation between the ranks of predictions and labels. Correct ordering matters even when absolute scores are imperfect. Individual base learners still optimize squared-error-style losses; selecting hyperparameters using Spearman does not turn their loss into a differentiable ranking objective.
-
-The reported final correlation of ~0.39 exceeds the task rubric's ≥0.35 highest Spearman band. Deliverables include predictions for the full test set and ten recommended mutants. Official top-10 percentile scores, leaderboard placement, and independent wet-lab validation are not included in the available results.
-
-## Data and experimental budget
-
-| Artifact | Observed contents | Purpose |
-|---|---:|---|
-| `data/sequence.fasta` | One 656-residue wild-type sequence | Reconstruct full mutant sequences |
-| `data/train.csv` | 1,140 labeled mutants | Initial supervised training |
-| `data/test.csv` | 11,324 mutants without labels | Prediction and acquisition pool |
-| `data/query_round_{1,2,3}.txt` | 100 unique mutants per round | Historical oracle requests |
-| `data/query_round_{1,2,3}_results.csv` | 100 measured labels per round | Expand training to 1,440 unique mutants |
-| `predictions.csv` | 11,324 predictions | Archived final submission |
-| `top10.txt` | Ten candidate mutants | Archived recommendation list |
-
-A mutation such as `W560F` means “replace wild-type tryptophan W at **zero-based** position 560 with phenylalanine F.” Sequence reconstruction validates the wild-type residue and bounds before making the substitution. The supplied counts total 12,464 single-site variants, matching 656 × 19 alternatives.
-
-The test pool continues to include queried mutants, as required by the task. The task permits acquired labels to be incorporated into training. This evaluation differs from a test set whose labels must remain entirely inaccessible throughout development.
-
-## Architecture
+## Technical implementation
 
 ```mermaid
 flowchart TD
-    A[Wild-type FASTA and mutation identifiers] --> B[Validate mutations and build full sequences]
-    B --> C[Biochemical features: 51 columns by default]
-    B --> D[Frozen ESM-2 embeddings: 320 dimensions by default]
-    B --> E[Masked ESM zero-shot score]
-    F[Optional structural CSV: SASA and B-factor] --> G[Trailing feature block]
-    E --> G
-    C --> H[Assemble feature matrix]
-    D --> H
-    G --> H
-    H --> I[Position-grouped training folds]
-    I --> J[Training-only augmentation and fold-wise PLM PCA]
-    J --> K[XGBoost: biochemical view]
-    J --> L[ElasticNet: view without PLM embeddings]
-    J --> M[RF, Ridge, kNN and MLP: full view]
-    K --> N[Out-of-fold base predictions]
-    L --> N
-    M --> N
-    N --> O[Ridge meta-model: alpha selected by Spearman]
-    O --> P[Candidate fitness predictions]
-    P --> Q[predictions.csv and top10.txt]
-    P --> R[Active-learning acquisition]
+    A[Wild-type sequence and mutation identifiers] --> B[Validate and reconstruct mutant sequences]
+    B --> C[Biochemical descriptors]
+    B --> D[Frozen ESM-2 embeddings and zero-shot scores]
+    C --> E[Feature matrix]
+    D --> E
+    E --> F[Position-grouped folds and training-fold PCA]
+    F --> G[Base regressors]
+    G --> H[Out-of-fold predictions]
+    H --> I[Ridge stacking model]
+    I --> J[Fitness predictions and top-10 recommendations]
+    I --> K[Active-learning selection]
+    K --> L[Acquire labels and retrain downstream models]
+    L --> E
 ```
 
-### Frozen representations and feature engineering
+### Feature extraction
 
-Frozen representations provide pretrained sequence context while limiting the number of parameters fitted to the small labeled dataset. This reduces the computational cost and overfitting risk associated with updating the full protein model.
+The default representation has **372 columns before PCA**:
 
-The default protein model is **ESM-2 8M**, `esm2_t6_8M_UR50D`. Final-layer residue representations are mean-pooled into a 320-dimensional sequence embedding. The code supports larger ESM-2 models, ESM-1v, and ProtT5, but support does not establish that those models produced the submitted result.
+- **51 biochemical features:** amino acid identities, normalized position, hydrophobicity and charge descriptors, five ProtParam properties, and BLOSUM62 substitution scores.
+- **320 ESM-2 features:** mean-pooled final-layer embeddings from `esm2_t6_8M_UR50D`.
+- **One zero-shot score:** the masked-site log-probability difference between mutant and wild-type residues.
 
-The default feature matrix has **372 columns before PCA**:
+ESM runs in evaluation mode under `torch.no_grad()`. **The protein model is frozen; no ESM fine-tuning or LoRA is performed.** Supervised training updates the downstream models. Embeddings are cached, and PCA reduces the embedding block to at most 128 components within training folds. Optional structural input adds SASA and B-factor features; none is included in the default run.
 
-- **51 biochemical columns:** 20 wild-type and 20 destination amino acid indicators; normalized position; four descriptors for hydrophobicity/charge changes and source/destination hydrophobicity; five whole-sequence ProtParam properties; and one BLOSUM62 substitution score.
-- **320 embedding columns:** contextual sequence information from frozen ESM-2.
-- **One zero-shot column:** at the masked mutation site, `log P(mutant residue | context) − log P(wild-type residue | context)`. This is a pretrained evolutionary prior, not the supervised fitness prediction.
+### Regression and stacking
 
-A structural CSV can add two columns, but none was supplied and `structure_csv=None` by default. PCA reduces the PLM block to at most 128 components, limited by training sample count. Feature routing lets different models use different views of the same assembled matrix.
+| Model | Feature view |
+|---|---|
+| XGBoost | Biochemical features |
+| ElasticNetCV | Biochemical and trailing features, excluding embeddings |
+| Random forest, Ridge, kNN, MLP | Full feature matrix |
 
-### Base learners and feature routing
+Base models generate out-of-fold predictions using `GroupKFold` grouped by mutation position. A Ridge meta-model combines these predictions; its regularization strength is selected using cross-validation Spearman correlation. Base learners use squared-error-style objectives.
 
-| Base learner | Actual feature view | Reason to include it |
-|---|---|---|
-| XGBoost | Traditional biochemical block | Nonlinear interactions in compact features |
-| Random forest | Full feature matrix | Nonlinear partitioning and model diversity |
-| Ridge | Full feature matrix | Regularized linear baseline |
-| ElasticNetCV | Traditional + trailing blocks, excluding embeddings | Sparse/regularized compact baseline |
-| k-nearest neighbors | Full feature matrix | Local similarity baseline |
-| MLP | Full feature matrix | Small learned nonlinear regressor |
+The MLP has two 256-unit hidden layers with ReLU and 0.2 dropout, trained with MSE, AdamW, and early stopping. Additional regularization includes embedding noise and upper-tail augmentation. The augmentation code attempts `SMOTER` and falls back to duplicating high-fitness samples with Gaussian feature noise.
 
-All six are enabled in the final `Config`. PCA and scaling are part of the fitting paths. The code can fall back to scikit-learn's `HistGradientBoostingRegressor` if XGBoost is unavailable, so record the actual backend when reproducing a run.
+### Active learning
 
-The MLP is trained from scratch: **input → 256/ReLU/dropout(0.2) → 256/ReLU/dropout(0.2) → scalar**, with MSE, AdamW, a default learning rate of 0.001, weight decay 0.0001, and early stopping. Training this MLP does not update the protein model.
+| Round | Acquisition strategy | Measured batch mean DMS |
+|---|---|---:|
+| 1 | Equal weighting of predicted fitness and distance from labeled embeddings | 0.7780 |
+| 2 | Portfolio: 28% UCB/EI, 28% greedy, 24% hybrid, 20% random | 0.8013 |
+| 3 | Top-candidate neighborhood prefill, followed by greedy/UCB/hybrid/random selection | 0.8261 |
 
-### Stacking procedure
+UCB and expected improvement use disagreement across base models as an uncertainty proxy. Query selection excludes labeled and previously queried mutants, applies diversity penalties, and supports destination amino acid caps and floors. Each round is capped at 100 queries; returned labels are merged before retraining. The repository includes the historical query requests and measurements.
 
-Each base learner predicts validation samples that were excluded from its own fit. Those out-of-fold predictions form a matrix with one column per base model. A Ridge meta-model learns how to combine them. Its regularization strength is selected from 24 log-spaced values using mean inner-CV Spearman; the fitted Ridge still minimizes a regularized squared-error objective.
-
-At inference, fitted base models produce the same six-column prediction representation for each candidate, and the fitted meta-model combines it. This avoids fitting the combiner solely on overoptimistic in-sample base predictions. The implementation has additional validation caveats described below.
-
-## Active learning strategy
-
-```mermaid
-flowchart LR
-    A[Initial 1,140 labeled mutants] --> B[Fit downstream models]
-    B --> C[Score eligible test mutants]
-    C --> D[Acquisition portfolio]
-    D --> E[Exclude labeled and previously queried mutants]
-    E --> F[Select at most 100 candidates]
-    F --> G[Course oracle returns measured DMS labels]
-    G --> H[Merge labels and deduplicate]
-    H --> B
-    B --> I[Final predictions and top 10]
-```
-
-The oracle represents an experimental labeling budget; the repository does not execute new laboratory experiments or call a live oracle. Historical measurements are already included.
-
-| Round | Strategy in the final code/report | Query mean DMS | Median DMS | Distinct positions |
-|---|---|---:|---:|---:|
-| 1 | 50/50 normalized predicted fitness and distance to nearest labeled embedding | 0.7780 | 0.8410 | 51 |
-| 2 | 28% UCB/EI, 28% greedy, 24% hybrid, 20% random; substitution-error steering | 0.8013 | 0.8511 | 61 |
-| 3 | Neighborhood prefill around top candidates, then greedy/UCB/hybrid/random; destination caps/floors | 0.8261 | 0.8554 | 49 |
-
-These means are recomputed from the archived labels. They describe **the selected batches**, not improvement in the protein's fitness or a controlled active-learning benchmark. There is no matched random-acquisition ablation establishing the causal benefit of the portfolio.
-
-The acquisition functions have complementary purposes:
-
-- **Greedy:** prioritize high predicted fitness for exploitation.
-- **Hybrid:** combine normalized predicted fitness with distance to the nearest labeled example for exploration. `hybrid_alpha` weights distance; it is 0.5 in round 1.
-- **UCB:** predicted mean plus `beta × disagreement`, where disagreement is the standard deviation across base predictions.
-- **Expected improvement:** a Gaussian approximation using the same mean/disagreement and the best measured fitness.
-- **Random:** maintain some coverage beyond the model's current preferences.
-
-Disagreement is a heuristic uncertainty proxy, not a calibrated posterior standard deviation. UCB/EI therefore provide acquisition heuristics rather than formal Bayesian guarantees.
-
-The code blocks both previously measured mutants and archived requests. Diversity penalties reduce near-duplicate selections; destination amino acid floors/caps help balance substitution types. Round 3 disables round-2 diagnostic weighting to concentrate attention on the high-prediction tail.
-
-**Round-3 implementation detail:** defaults prefill five neighbors, then allocate nominal budgets of 35 greedy, 28 UCB, 22 hybrid, and 15 random. The total is capped at 100, so with a full prefill only ten random slots remain before destination balancing. The final allocation can therefore differ from the nominal budgets.
+Batch means describe selected candidates, not measured improvement over wild type. Architecture and acquisition changes were introduced together, so their individual contributions were not isolated.
 
 ## Results
 
-### Reported external development milestones
+| Development stage | Reported external Spearman |
+|---|---:|
+| Baseline | ~0.05 |
+| After initial PLM integration and querying | ~0.19 |
+| Stacking, PCA, and portfolio acquisition | ~0.39 |
 
-| Milestone | Approximate Spearman | Changes associated with that stage in the report |
-|---|---:|---|
-| Baseline checkpoint | 0.05 | Naive predictor |
-| After round 1 | 0.19 | PLM features and initial active learning |
-| After round 2 / reported final result | 0.39 | Stacking, fold-wise PCA, and portfolio querying |
+The reported gain is **~0.34 Spearman**. Saved notebook outputs separately record a local stack mean of **0.7072 ± 0.0537** across five random holdouts, nearly tied with random forest at **0.7069**. Local and external scores use different evaluation protocols and are not directly comparable. Historical metrics are preserved in [results/saved_notebook_metrics.json](results/saved_notebook_metrics.json); full training has not been rerun during repository preparation.
 
-The absolute reported gain is **~0.34 Spearman**. Multiple changes were introduced together; the report does not isolate how much each change contributed. It also does not provide a distinct post-round-3 leaderboard score. The PDFs are the source for this trajectory; no original leaderboard export is included.
+The submission contains predictions for all 11,324 test mutants and ten recommendations. Official top-10 percentile results and independent wet-lab validation are not included.
 
-```mermaid
-flowchart LR
-    A[Baseline: about 0.05] --> B[PLM features and initial querying: about 0.19]
-    B --> C[Ensemble, PCA and portfolio queries: about 0.39]
-```
+**Evaluation limitations:** base OOF folds are position-grouped, but outer holdouts and the meta-model's inner alpha search are random by sample. MLP early stopping uses base validation labels. Optional Optuna tuning is disabled in the supplied notebook and would require restructuring to preserve an untouched outer holdout. Dependencies are unpinned. Further details are documented in [implementation notes](docs/evidence.md).
 
-### Saved local evaluation from the submitted notebook
+## Setup and execution
 
-| Model | One saved 12% holdout | Mean across five holdouts |
-|---|---:|---:|
-| Stack | 0.6585 | **0.7072 ± 0.0537** |
-| Random forest | **0.6771** | 0.7069 |
-| XGBoost | 0.6369 | 0.6866 |
-| MLP | 0.5047 | 0.5311 |
-| Ridge | 0.4352 | 0.4850 |
-| ElasticNet | 0.4018 | 0.4590 |
-| kNN | 0.3372 | 0.4337 |
-
-Values come from outputs saved in the supplied notebook, preserved as [structured metrics](results/saved_notebook_metrics.json). They were not regenerated while preparing this repo. The ± value is the saved standard deviation across five splits, not a confidence interval.
-
-The stack and random forest achieved nearly identical repeated-holdout means, differing by approximately 0.0002. Random forest performed better on the single saved holdout. These results do not establish a consistent performance advantage for the additional stacking complexity.
-
-The local ~0.707 score and external ~0.39 score use different evaluation populations and protocols and are not directly comparable. The available artifacts do not establish the precise cause of the difference.
-
-### Archived top-10 recommendations
-
-`W560F`, `W590F`, `W582Y`, `W590Y`, `W560Y`, `T572S`, `T572V`, `I611V`, `Y598F`, `T606S`.
-
-These are model recommendations. The provided files do not establish their final global percentile ranks or measured improvement relative to wild type.
-
-## Validation, regularization, and limitations
-
-The key generalization problem is predicting mutations at new residue positions. Randomly splitting substitutions can place different mutations at the same position in both training and validation, making position memorization look like generalization.
-
-```mermaid
-flowchart TD
-    A[Labels merged from original train and query results] --> B[Random 12% outer holdout]
-    A --> C[Five random outer holdouts for stability]
-    B --> D[Remaining development samples]
-    D --> E[GroupKFold by mutation position]
-    E --> F[Fit augmentation, PCA and base models on training fold]
-    F --> G[Predict validation positions for base OOF matrix]
-    G --> H[Ridge combiner]
-    H --> I[Evaluate outer holdout]
-    A --> J[Refit final stack on all available labels]
-    J --> K[Predict entire required test pool]
-```
-
-**Implemented safeguards:** position-grouped base OOF folds; PLM PCA fit within training folds; regularized linear learners; MLP dropout and early stopping; embedding noise; upper-tail augmentation; query deduplication; and repeated holdout evaluation.
-
-**Evaluation limitations:**
-
-- **Outer holdouts are random by mutant, not grouped by position.** LPO is used inside stacking, so local holdout scores are not a strict unseen-position benchmark.
-- **Saved holdout membership is conditional.** It is reused only while the sample count and ordered mutant hash match; adding query labels can regenerate it. It is not an immutable test set across acquisition rounds.
-- **Meta-selection is not fully nested/grouped.** The Ridge alpha search uses shuffled KFold and scales its OOF matrix before its inner splits. A stricter design would fit scaling per inner fold and group by position. Meta OOF diagnostics reuse a shared base OOF matrix rather than rebuilding the whole stack inside each outer diagnostic fold.
-- **MLP early stopping observes the base validation fold's labels.** Its OOF values are therefore not fully independent of those labels for model selection. An inner early-stopping split would give cleaner estimates.
-- **Optional Optuna tuning runs before the outer holdout split in this pipeline.** Enabling it would compromise that holdout as an untouched evaluation. It is disabled in the supplied notebook. A revised evaluation should restrict tuning to development folds.
-- **“SMOTE” has a fallback.** The code attempts `imblearn.over_sampling.SMOTER`; if unavailable, it duplicates high-fitness training samples with Gaussian feature noise. The saved artifacts do not identify which augmentation branch ran.
-- **No controlled ablation or independent leaderboard record is included.** Reported stages support a development narrative, not causal attribution to each feature or model.
-- **Dependencies are unpinned and weights/caches are absent.** Results may vary with library versions, backend, and hardware. Exact historical reproduction is not guaranteed.
-
-Further implementation details and discrepancies between the report and code are documented in [Evidence and provenance](docs/evidence.md).
-
-## Installation and usage
-
-Use Python 3.11–3.13 as a practical starting point; the original archive does not specify an exact environment. This repo retains the team's `pipeline.py` implementation. The notebook's saved outputs were cleared for readability; historical metrics are stored separately.
+Use Python 3.11–3.13 from the repository root:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python scripts/audit_artifacts.py
 jupyter lab pipeline.ipynb
 ```
 
-Run notebook cells from the repository root. The notebook installs dependencies, creates `Config`, trains and evaluates the stack, then exports `predictions.csv` and `top10.txt`. The repository includes the historical versions of these files; a new run overwrites them. First execution downloads pretrained ESM weights and computes embeddings for full 656-residue sequences; repeated evaluation makes a full run substantially more expensive than the artifact audit. The device selector uses CUDA, then Apple MPS, then CPU.
+Run all notebook cells to load the original data and all three query-result files, extract features, train and evaluate the stack, and export `predictions.csv` and `top10.txt`. A new run overwrites those archived submission files. Initial execution downloads pretrained weights; embeddings are cached locally. Device selection uses CUDA, then Apple MPS, then CPU.
 
-For the same workflow from Python:
-
-```python
-from pathlib import Path
-from pipeline import Config, run_pipeline, export_submission_files
-
-root = Path.cwd()
-cfg = Config(
-    data_dir=root / "data",
-    cache_dir=root / "cache",
-    holdout_index_path=root / "cache" / "holdout_indices.npy",
-)
-results = run_pipeline(cfg, run_optuna=False)
-print(results.holdout_spearman)
-print(results.repeated_holdout)
-print(export_submission_files(results))
-```
-
-All three query-result files are loaded by default. This reproduces the **final available training set**, not the chronological round-1 model. To replay acquisition history, use a separate data directory containing only labels and archived requests available at that point. `export_query_file(results, "round1")` writes a local query file; it neither requests labels nor submits anything. With the final directory, all three historical batches are already blocked.
-
-Optional structural input requires `mutant`, exactly one SASA-like numeric column, and exactly one B-factor-like numeric column. Missing mutants receive zero structural values. Optuna is opt-in through `run_pipeline(cfg, run_optuna=True)`. The current tuning order has the evaluation limitation described above.
-
-**Lightweight verification without ML dependencies:**
+To verify the included artifacts without installing ML dependencies:
 
 ```bash
 python3 scripts/audit_artifacts.py
-python3 -m compileall -q pipeline.py scripts
 ```
 
-The audit uses only Python's standard library. It checks sequence consistency, unique mutations, query exclusions, prediction coverage/range, top-10 membership/order, and recomputes round statistics. It does not retrain the model or verify hidden test performance. CI runs these same checks.
+The audit checks mutation sequences, query uniqueness, prediction coverage and bounds, and top-10 consistency. GitHub Actions also runs this audit and compiles the Python sources.
 
-## Repository map
+## Files
 
-```text
-.
-├── pipeline.py                 # Original final team implementation
-├── pipeline.ipynb              # Original notebook, outputs cleared
-├── requirements.txt            # Team dependencies + notebook runner
-├── data/                       # Original inputs, query requests and returned labels
-├── predictions.csv             # Historical 11,324-row prediction submission
-├── top10.txt                    # Historical candidate recommendation submission
-├── GroupName.txt               # Non-secret team number
-├── results/
-│   └── saved_notebook_metrics.json
-├── scripts/audit_artifacts.py   # Dependency-free artifact verification
-├── docs/
-│   ├── report/                 # Original team report
-│   ├── instructions/           # Course guide, slides and logistics
-│   ├── evidence.md             # Provenance and report/code discrepancies
-│   ├── original-README.md      # Team's original run instructions
-│   └── source-manifest.json    # Source filenames and SHA-256 hashes
-└── .github/workflows/verify.yml
-```
+| Path | Contents |
+|---|---|
+| `pipeline.py` / `pipeline.ipynb` | Final team implementation and notebook |
+| `data/` | Wild-type sequence, training/test data, query requests and measurements |
+| `predictions.csv` / `top10.txt` | Archived final submissions |
+| `results/` | Saved local evaluation metrics |
+| `docs/report/` / `docs/instructions/` | Team report and course materials |
+| `docs/evidence.md` | Provenance and implementation limitations |
+| `scripts/audit_artifacts.py` | Artifact validation |
 
-The repository preserves the final team implementation and supporting project materials. Source provenance and documentation changes are recorded in [docs/evidence.md](docs/evidence.md).
-
-`APIKey.txt` is deliberately excluded and ignored. No oracle credential is needed to read the project, inspect saved artifacts, or retrain on the provided labels. The original course materials and team work retain their existing ownership; no new redistribution license is asserted.
-
-## Future work
-
-Further evaluation would focus on separating the effects of model architecture, feature representation, and acquisition strategy:
-
-- **Nested position-grouped validation:** group outer evaluation splits by residue position and perform preprocessing, hyperparameter selection, and early stopping within the corresponding training partitions.
-- **Acquisition baselines:** compare portfolio querying against repeated random-query runs under identical label budgets and model configurations.
-- **Feature and model ablations:** measure the contributions of biochemical features, frozen embeddings, zero-shot scores, and each base learner; compare the stack with the simpler random forest baseline.
-- **Ranking objectives and top-tail evaluation:** evaluate pairwise ranking losses and candidate-selection metrics alongside overall Spearman correlation.
-- **Uncertainty calibration:** assess whether ensemble disagreement identifies prediction errors and supports effective acquisition decisions.
-- **Parameter-efficient adaptation:** compare frozen ESM representations with LoRA or other fine-tuning methods under consistent validation and computational budgets.
-
-## Team and attribution
-
-This project was developed by Florin Brunner, Abigail Cressy, Sofia Oliver, Chittebbayi Penugonda, and Eric Sheng. The report describes approximately equal contributions following an initial phase of independent model exploration. Course materials retain their original authorship.
+Oracle credentials are excluded. No API key is needed to train with the included measurements. Original course materials and team work retain their existing ownership.
